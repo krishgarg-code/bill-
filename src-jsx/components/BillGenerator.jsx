@@ -310,7 +310,7 @@ const BillGenerator = ({ onLogout }) => {
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-[2000px] mx-auto p-2 mx-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-5 mt-5">
+        <div className="flex items-center justify-between mb-8 mt-8">
           <div>
             <h1 className="text-4xl font-bold text-slate-800 mb-2">
               Bill Generator
@@ -352,7 +352,7 @@ const BillGenerator = ({ onLogout }) => {
         {/* Main Content Grid - 3 large columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
           {/* Left Column - Basic Information */}
-          <Card className="bg-white border-slate-200 shadow-lg h-[600px] rounded-lg border border-slate-300">
+          <Card className="bg-white border-slate-200 shadow-lg h-[630px] rounded-lg border border-slate-300">
             <CardHeader className="pb-4 bg-slate-800 border-b border-slate-700">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <FileText size={18} />
@@ -506,7 +506,7 @@ const BillGenerator = ({ onLogout }) => {
           </Card>
 
           {/* Middle Column - Financial Details */}
-          <Card className="bg-white border-slate-200 shadow-lg h-[600px] rounded-lg border border-slate-300">
+          <Card className="bg-white border-slate-200 shadow-lg h-[630px] rounded-lg border border-slate-300">
             <CardHeader className="pb-4 bg-slate-800 border-b border-slate-700">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <Calculator size={18} />
@@ -618,7 +618,7 @@ const BillGenerator = ({ onLogout }) => {
           </Card>
 
           {/* Right Column - Add Items */}
-          <Card className="bg-white border-slate-200 shadow-lg h-[600px] flex flex-col rounded-lg border border-slate-300">
+          <Card className="bg-white border-slate-200 shadow-lg h-[630px] flex flex-col rounded-lg border border-slate-300">
             <CardHeader className="pb-4 bg-slate-800 border-b border-slate-700">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <Plus size={18} />
