@@ -308,11 +308,11 @@ const BillGenerator = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="max-w-[2000px] mx-auto p-2">
+      <div className="max-w-[2000px] mx-auto p-2 mx-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-8 mt-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">
+            <h1 className="text-4xl font-bold text-slate-800 mb-2">
               Bill Generator
             </h1>
           </div>
@@ -321,29 +321,29 @@ const BillGenerator = ({ onLogout }) => {
             <Button
               onClick={handleReset}
               variant="outline"
-              size="sm"
-              className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 text-sm px-4 py-2 h-auto"
+              size="default"
+              className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 text-base px-6 py-2 h-auto"
             >
-              <RotateCcw size={16} className="mr-1" />
+              <RotateCcw size={20} className="mr-2" />
               Reset
             </Button>
 
             <Button
               onClick={handleGenerate}
-              size="sm"
-              className="bg-orange-500 hover:bg-orange-600 text-sm px-4 py-2 h-auto"
+              size="default"
+              className="bg-orange-500 hover:bg-orange-600 text-base px-6 py-2 h-auto"
             >
-              <FileText size={16} className="mr-1" />
+              <FileText size={20} className="mr-2" />
               Generate Bill
             </Button>
 
             <Button
               onClick={onLogout}
               variant="outline"
-              size="sm"
-              className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 text-sm px-4 py-2 h-auto"
+              size="default"
+              className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 text-base px-6 py-2 h-auto"
             >
-              <LogOut size={16} className="mr-1" />
+              <LogOut size={20} className="mr-2" />
               Logout
             </Button>
           </div>
