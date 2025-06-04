@@ -352,7 +352,7 @@ const BillGenerator = ({ onLogout }) => {
         {/* Main Content Grid - 3 large columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
           {/* Left Column - Basic Information */}
-          <Card className="bg-white border-slate-200 shadow-lg h-[630px] rounded-lg border border-slate-300">
+          <Card className="bg-white border-slate-200 shadow-lg h-[600px] rounded-lg border border-slate-300">
             <CardHeader className="pb-4 bg-slate-800 border-b border-slate-700">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <FileText size={18} />
@@ -506,7 +506,7 @@ const BillGenerator = ({ onLogout }) => {
           </Card>
 
           {/* Middle Column - Financial Details */}
-          <Card className="bg-white border-slate-200 shadow-lg h-[630px] rounded-lg border border-slate-300">
+          <Card className="bg-white border-slate-200 shadow-lg h-[600px] rounded-lg border border-slate-300">
             <CardHeader className="pb-4 bg-slate-800 border-b border-slate-700">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <Calculator size={18} />
@@ -618,7 +618,7 @@ const BillGenerator = ({ onLogout }) => {
           </Card>
 
           {/* Right Column - Add Items */}
-          <Card className="bg-white border-slate-200 shadow-lg h-[630px] flex flex-col rounded-lg border border-slate-300">
+          <Card className="bg-white border-slate-200 shadow-lg h-[600px] flex flex-col rounded-lg border border-slate-300">
             <CardHeader className="pb-4 bg-slate-800 border-b border-slate-700">
               <CardTitle className="text-white text-lg flex items-center gap-2">
                 <Plus size={18} />
