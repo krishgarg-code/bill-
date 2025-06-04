@@ -310,7 +310,7 @@ const BillGenerator = ({ onLogout }) => {
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-[2000px] mx-auto p-2 mx-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8 mt-4">
+        <div className="flex items-center justify-between mb-8 mt-1">
           <div>
             <h1 className="text-4xl font-bold text-slate-800 mb-2">
               Bill Generator
