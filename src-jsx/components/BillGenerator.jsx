@@ -401,7 +401,7 @@ const BillGenerator = ({ onLogout }) => {
                     htmlFor="amount"
                     className="text-slate-700 font-semibold text-sm"
                   >
-                    Net Amount
+                    Bill Amount
                   </Label>
                   <Input
                     id="amount"
