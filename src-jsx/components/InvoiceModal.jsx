@@ -287,7 +287,7 @@ const InvoiceModal = ({ formData, items, calculations, onClose }) => {
                     <span>₹{grandTotal}</span>
                   </div>
                   <div className="flex justify-between text-lg font-semibold">
-                    <span>Net Amount:</span>
+                    <span>Bill Amount:</span>
                     <span>₹{formData.amount}</span>
                   </div>
                   <div
