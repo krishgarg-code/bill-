@@ -336,16 +336,6 @@ const BillGenerator = ({ onLogout }) => {
               <FileText size={20} className="mr-2" />
               Generate Bill
             </Button>
-
-            <Button
-              onClick={onLogout}
-              variant="outline"
-              size="default"
-              className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 text-base px-6 py-2 h-auto"
-            >
-              <LogOut size={20} className="mr-2" />
-              Logout
-            </Button>
           </div>
         </div>
 
