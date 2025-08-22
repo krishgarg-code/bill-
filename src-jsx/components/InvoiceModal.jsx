@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import html2pdf from "html2pdf.js";
 
 const InvoiceModal = ({ formData, items, calculations, onClose }) => {
-  const { itemTotal, OPFP, grandTotal, endTotal, totalQuantity, bankCharges } =
-    calculations;
+  const { itemTotal, OPFP, grandTotal, endTotal, totalQuantity } = calculations;
 
   const handlePrint = () => {
     const printContents = document.getElementById("invoice-section")?.innerHTML;
@@ -139,7 +138,7 @@ const InvoiceModal = ({ formData, items, calculations, onClose }) => {
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
               <h3 className="text-lg font-semibold text-gray-700 mb-3">
-                Bill To:
+                Bill From:
               </h3>
               <p className="text-xl font-medium text-gray-800">
                 {formData.partyName}
@@ -156,6 +155,11 @@ const InvoiceModal = ({ formData, items, calculations, onClose }) => {
               {formData.bill && (
                 <p>
                   <strong>Basic Price:</strong> ₹{formData.bill}
+                </p>
+              )}
+              {formData.billNumber && (
+                <p>
+                  <strong>Bill Number:</strong> {formData.billNumber}
                 </p>
               )}
             </div>
@@ -271,12 +275,14 @@ const InvoiceModal = ({ formData, items, calculations, onClose }) => {
                   <span>-₹{formData.dalla}</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span>
-                  <strong>Bank Charges:</strong>
-                </span>
-                <span>-₹{bankCharges}</span>
-              </div>
+              {(formData.rtgsCharges && formData.rtgsCharges !== "0") ? (
+                <div className="flex justify-between">
+                  <span>
+                    <strong>RTGS Charges:</strong>
+                  </span>
+                  <span>-₹{formData.rtgsCharges}</span>
+                </div>
+              ) : null}
 
               <hr className="my-3" />
 
