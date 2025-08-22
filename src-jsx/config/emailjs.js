@@ -15,7 +15,7 @@ export const EMAILJS_CONFIG = {
 
 // Email Template Variables:
 // - to_email: Admin email address
-// - to_name: Admin name
+// - to_name: Admin name  
 // - from_name: Sender name
 // - subject: Email subject
 // - message: Email body with device info and OTP

@@ -24,17 +24,66 @@ const Login = ({ onLogin }) => {
   const PENDING_OTP_KEY = "billGenerator_pending_otp";
   const ADMIN_EMAIL = "krishg0150@gmail.com";
 
-  // Generate device fingerprint
+  // Generate device fingerprint with enhanced uniqueness
   const generateDeviceFingerprint = async () => {
     try {
+      // Use FingerprintJS as base
       const fp = await FingerprintJS.load();
       const result = await fp.get();
-      console.log("Generated fingerprint:", result.visitorId);
-      return result.visitorId;
+      
+      // Add additional unique identifiers for better browser separation
+      const additionalData = {
+        // Browser-specific data
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        screenWidth: window.screen.width,
+        screenHeight: window.screen.height,
+        colorDepth: window.screen.colorDepth,
+        pixelRatio: window.devicePixelRatio,
+        // Session-specific data
+        sessionId: Math.random().toString(36).substring(2, 15),
+        timestamp: Date.now(),
+        // Storage availability
+        localStorageAvailable: !!window.localStorage,
+        sessionStorageAvailable: !!window.sessionStorage,
+        // Additional browser features
+        cookieEnabled: navigator.cookieEnabled,
+        doNotTrack: navigator.doNotTrack,
+        hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+        maxTouchPoints: navigator.maxTouchPoints || 0,
+      };
+      
+      // Create a unique hash combining FingerprintJS + additional data
+      const combinedString = result.visitorId + JSON.stringify(additionalData);
+      const hash = await createHash(combinedString);
+      
+      console.log("Enhanced fingerprint generated:", hash);
+      
+      return hash;
     } catch (error) {
       console.error("Failed to generate device fingerprint:", error);
-      throw new Error("Device fingerprint generation failed");
+      // Fallback to basic fingerprint
+      const fallbackData = {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        timestamp: Date.now(),
+        random: Math.random().toString(36).substring(2, 15)
+      };
+      const fallbackString = JSON.stringify(fallbackData);
+      return await createHash(fallbackString);
     }
+  };
+
+  // Create a simple hash function
+  const createHash = async (str) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex.substring(0, 16); // Return first 16 characters for readability
   };
 
   // Generate 6-digit OTP
@@ -63,6 +112,9 @@ const Login = ({ onLogin }) => {
         console.warn("Could not fetch location:", error);
       }
 
+      // Generate fingerprint for this device
+      const fingerprint = await generateDeviceFingerprint();
+
       return {
         userAgent: ua,
         platform,
@@ -71,6 +123,7 @@ const Login = ({ onLogin }) => {
         screenResolution: screenRes,
         location,
         timestamp: new Date().toISOString(),
+        fingerprint: fingerprint,
       };
     } catch (error) {
       console.error("Failed to collect device info:", error);
@@ -111,12 +164,16 @@ OTP Code: ${otp}
 ---
 Bill Generator Security System
         `,
-        // Add these variables that your template expects
+        // CRITICAL: These must match your EmailJS template variables exactly
         username: username,
-        otp_code: otp,
+        otp_code: otp,  // This should populate {{otp_code}} in your template
         device_fingerprint: deviceInfo.fingerprint || 'N/A',
         location: deviceInfo.location || 'N/A',
         time: deviceInfo.timestamp || new Date().toISOString(),
+        // Backup variables in case your template uses different names
+        otp: otp,  // Alternative: {{otp}}
+        code: otp,  // Alternative: {{code}}
+        verification_code: otp,  // Alternative: {{verification_code}}
       };
 
       console.log("Template params:", templateParams);
@@ -612,6 +669,7 @@ Bill Generator Security System
                   </button>
                   
 
+                  
                 </form>
 
                 <div className="mt-10 text-center animate-fade-in-up animation-delay-700">
