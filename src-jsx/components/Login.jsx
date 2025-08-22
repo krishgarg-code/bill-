@@ -59,7 +59,7 @@ const Login = ({ onLogin }) => {
       const combinedString = result.visitorId + JSON.stringify(additionalData);
       const hash = await createHash(combinedString);
       
-      console.log("Enhanced fingerprint generated:", hash);
+              console.log("Device fingerprint generated successfully");
       
       return hash;
     } catch (error) {
@@ -86,8 +86,20 @@ const Login = ({ onLogin }) => {
     return hashHex.substring(0, 16); // Return first 16 characters for readability
   };
 
-  // Generate 6-digit OTP
+  // Generate 6-digit OTP with rate limiting
   const generateOTP = () => {
+    const lastOTPTime = sessionStorage.getItem('lastOTPTime');
+    const now = Date.now();
+    
+    // Rate limit: Only allow OTP generation every 30 seconds
+    if (lastOTPTime && (now - parseInt(lastOTPTime)) < 30000) {
+      const remainingTime = Math.ceil((30000 - (now - parseInt(lastOTPTime))) / 1000);
+      throw new Error(`Please wait ${remainingTime} seconds before requesting another OTP`);
+    }
+    
+    // Store current time
+    sessionStorage.setItem('lastOTPTime', now.toString());
+    
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
@@ -176,7 +188,7 @@ Bill Generator Security System
         verification_code: otp,  // Alternative: {{verification_code}}
       };
 
-      console.log("Template params:", templateParams);
+      console.log("Sending OTP email via EmailJS...");
 
       const result = await emailjs.send(
         EMAILJS_CONFIG.serviceId,
@@ -185,11 +197,11 @@ Bill Generator Security System
         EMAILJS_CONFIG.publicKey
       );
 
-      console.log("EmailJS email sent successfully:", result);
+      console.log("OTP email sent successfully");
       toast({
         title: "OTP Email Sent!",
-        description: `OTP: ${otp} - Check your email at ${ADMIN_EMAIL}`,
-        duration: 8000,
+        description: "Check your email for the verification code",
+        duration: 5000,
       });
       
       return true;
@@ -254,9 +266,7 @@ Bill Generator Security System
         const currentFingerprint = await generateDeviceFingerprint();
         const storedFingerprint = localStorage.getItem(DEVICE_FINGERPRINT_KEY);
         
-        console.log("Login attempt:", {
-          currentFingerprint,
-          storedFingerprint,
+        console.log("Login attempt - Device verification:", {
           isNewDevice: !storedFingerprint,
           isSameDevice: storedFingerprint === currentFingerprint
         });
@@ -307,14 +317,15 @@ Bill Generator Security System
           setShowOTPDialog(true);
           
           // Store pending OTP in session storage
-          sessionStorage.setItem(PENDING_OTP_KEY, JSON.stringify({
-            otp,
-            fingerprint: currentFingerprint,
-            username: formData.username,
-            remember: formData.remember,
-            deviceInfo,
-            timestamp: Date.now(),
-          }));
+                                  sessionStorage.setItem(PENDING_OTP_KEY, JSON.stringify({
+                          otp,
+                          fingerprint: currentFingerprint,
+                          username: formData.username,
+                          remember: formData.remember,
+                          deviceInfo,
+                          timestamp: Date.now(),
+                          expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes expiration
+                        }));
 
           // Send OTP email
           await sendOTPEmail(otp, deviceInfo, formData.username);
@@ -365,7 +376,16 @@ Bill Generator Security System
         throw new Error("No pending OTP found");
       }
 
-      const { otp, fingerprint, username, remember, deviceInfo } = JSON.parse(pendingData);
+      const { otp, fingerprint, username, remember, deviceInfo, expiresAt } = JSON.parse(pendingData);
+
+      // Check if OTP has expired
+      if (expiresAt && Date.now() > expiresAt) {
+        sessionStorage.removeItem(PENDING_OTP_KEY);
+        setShowOTPDialog(false);
+        setOtpCode("");
+        setEnteredOTP("");
+        throw new Error("OTP has expired. Please request a new one.");
+      }
 
       console.log("OTP comparison:", { 
         enteredOTP: enteredOTP.trim(), 
@@ -476,7 +496,23 @@ Bill Generator Security System
   // Initialize EmailJS
   useEffect(() => {
     emailjs.init(EMAILJS_CONFIG.publicKey);
-    console.log("EmailJS initialized with public key:", EMAILJS_CONFIG.publicKey);
+    console.log("EmailJS initialized successfully");
+  }, []);
+
+  // Cleanup expired OTPs on page load
+  useEffect(() => {
+    const pendingData = sessionStorage.getItem(PENDING_OTP_KEY);
+    if (pendingData) {
+      try {
+        const { expiresAt } = JSON.parse(pendingData);
+        if (expiresAt && Date.now() > expiresAt) {
+          sessionStorage.removeItem(PENDING_OTP_KEY);
+          console.log("Expired OTP cleaned up");
+        }
+      } catch (error) {
+        console.error("Error cleaning up expired OTP:", error);
+      }
+    }
   }, []);
 
   // Restore pending OTP state on page reload
