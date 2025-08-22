@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
+import emailjs from "@emailjs/browser";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { EMAILJS_CONFIG } from "../config/emailjs";
 
 const Login = ({ onLogin }) => {
   const { toast } = useToast();
@@ -27,6 +29,7 @@ const Login = ({ onLogin }) => {
     try {
       const fp = await FingerprintJS.load();
       const result = await fp.get();
+      console.log("Generated fingerprint:", result.visitorId);
       return result.visitorId;
     } catch (error) {
       console.error("Failed to generate device fingerprint:", error);
@@ -77,6 +80,9 @@ const Login = ({ onLogin }) => {
 
   // Send OTP email using EmailJS
   const sendOTPEmail = async (otp, deviceInfo, username) => {
+    console.log("Attempting to send OTP email via EmailJS...");
+    console.log("EmailJS Config:", EMAILJS_CONFIG);
+    
     try {
       const templateParams = {
         to_email: ADMIN_EMAIL,
@@ -105,16 +111,24 @@ OTP Code: ${otp}
 ---
 Bill Generator Security System
         `,
+        // Add these variables that your template expects
+        username: username,
+        otp_code: otp,
+        device_fingerprint: deviceInfo.fingerprint || 'N/A',
+        location: deviceInfo.location || 'N/A',
+        time: deviceInfo.timestamp || new Date().toISOString(),
       };
 
-      await emailjs.send(
+      console.log("Template params:", templateParams);
+
+      const result = await emailjs.send(
         EMAILJS_CONFIG.serviceId,
         EMAILJS_CONFIG.templateId,
         templateParams,
         EMAILJS_CONFIG.publicKey
       );
 
-      console.log("EmailJS email sent successfully");
+      console.log("EmailJS email sent successfully:", result);
       toast({
         title: "OTP Email Sent!",
         description: `OTP: ${otp} - Check your email at ${ADMIN_EMAIL}`,
@@ -124,6 +138,11 @@ Bill Generator Security System
       return true;
     } catch (error) {
       console.error("Failed to send OTP email via EmailJS:", error);
+      console.error("Error details:", {
+        message: error.message,
+        status: error.status,
+        text: error.text
+      });
       
       // Fallback: Open email client with prefilled content
       const subject = encodeURIComponent(`Bill Generator - New Device Login - OTP: ${otp}`);
@@ -154,7 +173,7 @@ Bill Generator Security System
       
       toast({
         title: "EmailJS Failed - Using Fallback",
-        description: `OTP: ${otp} - Email client opened as fallback.`,
+        description: `OTP: ${otp} - Email client opened as fallback. Error: ${error.message}`,
         duration: 8000,
       });
       
@@ -397,6 +416,12 @@ Bill Generator Security System
     checkExistingSession();
   }, [onLogin]);
 
+  // Initialize EmailJS
+  useEffect(() => {
+    emailjs.init(EMAILJS_CONFIG.publicKey);
+    console.log("EmailJS initialized with public key:", EMAILJS_CONFIG.publicKey);
+  }, []);
+
   // Restore pending OTP state on page reload
   useEffect(() => {
     const pendingData = sessionStorage.getItem(PENDING_OTP_KEY);
@@ -585,6 +610,8 @@ Bill Generator Security System
                       </div>
                     )}
                   </button>
+                  
+
                 </form>
 
                 <div className="mt-10 text-center animate-fade-in-up animation-delay-700">
@@ -639,13 +666,6 @@ Bill Generator Security System
             </div>
             
             <div className="px-6 space-y-4">
-              {/* Test Mode: Show OTP for easier testing */}
-              <div className="text-sm text-orange-400 bg-orange-600/10 rounded-lg border border-orange-600/30 p-3 text-center">
-                <strong>TEST MODE - OTP Code: {otpCode}</strong>
-                <br />
-                <span className="text-xs text-orange-300">(This will be hidden in production)</span>
-              </div>
-              
               <div className="space-y-2">
                 <label className="block text-neutral-300 text-sm font-medium">
                   Enter OTP Code
