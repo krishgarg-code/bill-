@@ -33,7 +33,7 @@ const Login = ({ onLogin }) => {
       
       // Add additional unique identifiers for better browser separation
       const additionalData = {
-        // Browser-specific data
+        // Browser-specific data (STABLE - doesn't change)
         userAgent: navigator.userAgent,
         platform: navigator.platform,
         language: navigator.language,
@@ -42,17 +42,15 @@ const Login = ({ onLogin }) => {
         screenHeight: window.screen.height,
         colorDepth: window.screen.colorDepth,
         pixelRatio: window.devicePixelRatio,
-        // Session-specific data
-        sessionId: Math.random().toString(36).substring(2, 15),
-        timestamp: Date.now(),
-        // Storage availability
+        // Storage availability (STABLE)
         localStorageAvailable: !!window.localStorage,
         sessionStorageAvailable: !!window.sessionStorage,
-        // Additional browser features
+        // Additional browser features (STABLE)
         cookieEnabled: navigator.cookieEnabled,
         doNotTrack: navigator.doNotTrack,
         hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
         maxTouchPoints: navigator.maxTouchPoints || 0,
+        // REMOVED: sessionId and timestamp (these change every time!)
       };
       
       // Create a unique hash combining FingerprintJS + additional data
@@ -64,12 +62,15 @@ const Login = ({ onLogin }) => {
       return hash;
     } catch (error) {
       console.error("Failed to generate device fingerprint:", error);
-      // Fallback to basic fingerprint
+      // Fallback to basic fingerprint (STABLE)
       const fallbackData = {
         userAgent: navigator.userAgent,
         platform: navigator.platform,
-        timestamp: Date.now(),
-        random: Math.random().toString(36).substring(2, 15)
+        language: navigator.language,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        screenWidth: window.screen.width,
+        screenHeight: window.screen.height,
+        // REMOVED: timestamp and random (these change every time!)
       };
       const fallbackString = JSON.stringify(fallbackData);
       return await createHash(fallbackString);
@@ -145,8 +146,7 @@ const Login = ({ onLogin }) => {
 
   // Send OTP email using EmailJS
   const sendOTPEmail = async (otp, deviceInfo, username) => {
-    console.log("Attempting to send OTP email via EmailJS...");
-    console.log("EmailJS Config:", EMAILJS_CONFIG);
+    
     
     try {
       const templateParams = {
@@ -188,7 +188,7 @@ Bill Generator Security System
         verification_code: otp,  // Alternative: {{verification_code}}
       };
 
-      console.log("Sending OTP email via EmailJS...");
+      
 
       const result = await emailjs.send(
         EMAILJS_CONFIG.serviceId,
@@ -197,7 +197,7 @@ Bill Generator Security System
         EMAILJS_CONFIG.publicKey
       );
 
-      console.log("OTP email sent successfully");
+      
       toast({
         title: "OTP Email Sent!",
         description: "Check your email for the verification code",
@@ -266,33 +266,41 @@ Bill Generator Security System
         const currentFingerprint = await generateDeviceFingerprint();
         const storedFingerprint = localStorage.getItem(DEVICE_FINGERPRINT_KEY);
         
-        console.log("Login attempt - Device verification:", {
-          isNewDevice: !storedFingerprint,
-          isSameDevice: storedFingerprint === currentFingerprint
-        });
+        console.log("🔍 Login flow:", !storedFingerprint ? "FIRST TIME EVER" : 
+                storedFingerprint === currentFingerprint ? "SAME DEVICE" : "NEW DEVICE");
 
         if (!storedFingerprint) {
-          // First login - store fingerprint and proceed
-          localStorage.setItem(DEVICE_FINGERPRINT_KEY, currentFingerprint);
+          // FIRST TIME EVER - Require OTP verification for security
+          console.log("First time login - requiring OTP verification");
+          const deviceInfo = await collectDeviceInfo();
+          const otp = generateOTP();
           
-          // Store login state
-          if (formData.remember) {
-            localStorage.setItem("billGenerator_loggedIn", "true");
-            localStorage.setItem("billGenerator_username", formData.username);
-          } else {
-            sessionStorage.setItem("billGenerator_loggedIn", "true");
-            sessionStorage.setItem("billGenerator_username", formData.username);
-          }
+          setOtpCode(otp);
+          setShowOTPDialog(true);
+          
+          sessionStorage.setItem(PENDING_OTP_KEY, JSON.stringify({
+            otp,
+            fingerprint: currentFingerprint,
+            username: formData.username,
+            remember: formData.remember,
+            deviceInfo,
+            timestamp: Date.now(),
+            expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes expiration
+            isFirstTime: true, // Mark as first time
+          }));
+
+          await sendOTPEmail(otp, deviceInfo, formData.username);
 
           toast({
-            title: "Login Successful!",
-            description: `Welcome back, ${formData.username}!`,
-            duration: 2000,
+            title: "First Time Login - OTP Required",
+            description: "OTP sent to admin email. Please wait for approval.",
+            duration: 5000,
           });
-
-          onLogin(formData.username);
+          
+          setIsLoading(false);
+          return; // Don't proceed with login yet
         } else if (storedFingerprint === currentFingerprint) {
-          // Same device - proceed with login
+          // SAME DEVICE - Direct login (no OTP needed)
           if (formData.remember) {
             localStorage.setItem("billGenerator_loggedIn", "true");
             localStorage.setItem("billGenerator_username", formData.username);
@@ -309,7 +317,8 @@ Bill Generator Security System
 
           onLogin(formData.username);
         } else {
-          // New device detected - require OTP verification
+          // NEW DEVICE DETECTED - OTP verification required
+          console.log("New device detected - requiring OTP verification");
           const deviceInfo = await collectDeviceInfo();
           const otp = generateOTP();
           
@@ -317,15 +326,15 @@ Bill Generator Security System
           setShowOTPDialog(true);
           
           // Store pending OTP in session storage
-                                  sessionStorage.setItem(PENDING_OTP_KEY, JSON.stringify({
-                          otp,
-                          fingerprint: currentFingerprint,
-                          username: formData.username,
-                          remember: formData.remember,
-                          deviceInfo,
-                          timestamp: Date.now(),
-                          expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes expiration
-                        }));
+          sessionStorage.setItem(PENDING_OTP_KEY, JSON.stringify({
+            otp,
+            fingerprint: currentFingerprint,
+            username: formData.username,
+            remember: formData.remember,
+            deviceInfo,
+            timestamp: Date.now(),
+            expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes expiration
+          }));
 
           // Send OTP email
           await sendOTPEmail(otp, deviceInfo, formData.username);
@@ -376,7 +385,7 @@ Bill Generator Security System
         throw new Error("No pending OTP found");
       }
 
-      const { otp, fingerprint, username, remember, deviceInfo, expiresAt } = JSON.parse(pendingData);
+      const { otp, fingerprint, username, remember, deviceInfo, expiresAt, isFirstTime } = JSON.parse(pendingData);
 
       // Check if OTP has expired
       if (expiresAt && Date.now() > expiresAt) {
@@ -419,8 +428,8 @@ Bill Generator Security System
         setEnteredOTP("");
 
         toast({
-          title: "Device Approved!",
-          description: "New device has been approved and logged in.",
+          title: isFirstTime ? "First Time Login Successful!" : "Device Approved!",
+          description: isFirstTime ? "Welcome! Your device has been registered." : "New device has been approved and logged in.",
           duration: 3000,
         });
 
@@ -496,7 +505,7 @@ Bill Generator Security System
   // Initialize EmailJS
   useEffect(() => {
     emailjs.init(EMAILJS_CONFIG.publicKey);
-    console.log("EmailJS initialized successfully");
+    
   }, []);
 
   // Cleanup expired OTPs on page load
