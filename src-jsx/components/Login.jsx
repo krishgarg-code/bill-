@@ -622,7 +622,7 @@ Bill Generator Security System
               <div className="lg:w-1/2 p-6 sm:p-8 lg:p-12 flex flex-col justify-center bg-black/90">
                 <div className="text-center mb-10 animate-fade-in-up animation-delay-300">
                   <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-2 sm:mb-3">
-                    Sign in 
+                    login 
                   </h2>
                   <p className="text-neutral-300 text-base sm:text-lg">
                     Enter your credentials to access Bill Generator
@@ -725,7 +725,7 @@ Bill Generator Security System
                       </div>
                     ) : (
                       <div className="flex items-center justify-center space-x-3 text-lg">
-                        <span>Login</span>
+                        <span>Get access</span>
                         <svg className="w-6 h-6 transform group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                         </svg>
