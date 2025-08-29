@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import FingerprintJS from "@fingerprintjs/fingerprintjs";
+import { v4 as uuidv4 } from 'uuid';
 import emailjs from "@emailjs/browser";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -20,72 +20,110 @@ const Login = ({ onLogin }) => {
   const [isVerifyingOTP, setIsVerifyingOTP] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Storage keys
-  const DEVICE_FINGERPRINT_KEY = "billGenerator_device_fingerprint";
+  // Storage keys - using a more persistent key name
+  const DEVICE_TRUST_KEY = "billgen_trusted_device_uuid";
+  const DEVICE_FIRST_LOGIN_KEY = "billgen_device_first_login";
+  const USER_SESSION_KEY = "billgen_user_session";
   const PENDING_OTP_KEY = "billGenerator_pending_otp";
   const ADMIN_EMAIL = "krishg0150@gmail.com";
 
-  // Generate device fingerprint with enhanced uniqueness
-  const generateDeviceFingerprint = async () => {
+  // Generate a unique device token
+  const generateDeviceToken = () => {
+    return uuidv4(); // Generates a unique v4 UUID
+  };
+
+  // Check if this device has ever been trusted (first time check)
+  const isFirstTimeDevice = () => {
+    const hasToken = localStorage.getItem(DEVICE_TRUST_KEY);
+    const hasFirstLogin = localStorage.getItem(DEVICE_FIRST_LOGIN_KEY);
+    return !hasToken && !hasFirstLogin;
+  };
+
+  // Check if device is currently trusted
+  const isDeviceTrusted = () => {
+    const token = localStorage.getItem(DEVICE_TRUST_KEY);
+    const firstLogin = localStorage.getItem(DEVICE_FIRST_LOGIN_KEY);
+    return !!(token && firstLogin);
+  };
+
+  // Trust the current device permanently
+  const trustDevice = () => {
+    const token = generateDeviceToken();
+    const timestamp = new Date().toISOString();
+    
     try {
-      // Use FingerprintJS as base
-      const fp = await FingerprintJS.load();
-      const result = await fp.get();
+      // Store both the token and first login timestamp
+      localStorage.setItem(DEVICE_TRUST_KEY, token);
+      localStorage.setItem(DEVICE_FIRST_LOGIN_KEY, timestamp);
       
-      // Add additional unique identifiers for better browser separation
-      const additionalData = {
-        // Browser-specific data (STABLE - doesn't change)
-        userAgent: navigator.userAgent,
-        platform: navigator.platform,
-        language: navigator.language,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        screenWidth: window.screen.width,
-        screenHeight: window.screen.height,
-        colorDepth: window.screen.colorDepth,
-        pixelRatio: window.devicePixelRatio,
-        // Storage availability (STABLE)
-        localStorageAvailable: !!window.localStorage,
-        sessionStorageAvailable: !!window.sessionStorage,
-        // Additional browser features (STABLE)
-        cookieEnabled: navigator.cookieEnabled,
-        doNotTrack: navigator.doNotTrack,
-        hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
-        maxTouchPoints: navigator.maxTouchPoints || 0,
-        // REMOVED: sessionId and timestamp (these change every time!)
-      };
+      console.log("🔐 Device trusted permanently:", {
+        token: token,
+        timestamp: timestamp,
+        key1: DEVICE_TRUST_KEY,
+        key2: DEVICE_FIRST_LOGIN_KEY
+      });
       
-      // Create a unique hash combining FingerprintJS + additional data
-      const combinedString = result.visitorId + JSON.stringify(additionalData);
-      const hash = await createHash(combinedString);
+      // Verify storage
+      const storedToken = localStorage.getItem(DEVICE_TRUST_KEY);
+      const storedTimestamp = localStorage.getItem(DEVICE_FIRST_LOGIN_KEY);
       
-              console.log("Device fingerprint generated successfully");
-      
-      return hash;
+      if (storedToken && storedTimestamp) {
+        console.log("✅ Device trust stored successfully");
+        return { token, timestamp };
+      } else {
+        console.error("❌ Failed to verify device trust storage");
+        return null;
+      }
     } catch (error) {
-      console.error("Failed to generate device fingerprint:", error);
-      // Fallback to basic fingerprint (STABLE)
-      const fallbackData = {
-        userAgent: navigator.userAgent,
-        platform: navigator.platform,
-        language: navigator.language,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        screenWidth: window.screen.width,
-        screenHeight: window.screen.height,
-        // REMOVED: timestamp and random (these change every time!)
-      };
-      const fallbackString = JSON.stringify(fallbackData);
-      return await createHash(fallbackString);
+      console.error("❌ Failed to store device trust:", error);
+      return null;
     }
   };
 
-  // Create a simple hash function
-  const createHash = async (str) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(str);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex.substring(0, 16); // Return first 16 characters for readability
+  // Session management functions
+  const createUserSession = (username) => {
+    const sessionData = {
+      username: username,
+      loginTime: new Date().toISOString(),
+      isLoggedIn: true
+    };
+    localStorage.setItem(USER_SESSION_KEY, JSON.stringify(sessionData));
+    console.log("📝 User session created:", sessionData);
+  };
+
+  const getUserSession = () => {
+    try {
+      const sessionData = localStorage.getItem(USER_SESSION_KEY);
+      return sessionData ? JSON.parse(sessionData) : null;
+    } catch (error) {
+      console.error("Error reading user session:", error);
+      return null;
+    }
+  };
+
+  const clearUserSession = () => {
+    localStorage.removeItem(USER_SESSION_KEY);
+    console.log("🗑️ User session cleared");
+  };
+
+  const isUserLoggedIn = () => {
+    const session = getUserSession();
+    return session && session.isLoggedIn === true;
+  };
+
+  // Logout function - only clears session, keeps device trust
+  const handleLogout = () => {
+    clearUserSession();
+    console.log("👋 User logged out - device trust maintained");
+    // Note: Device trust is preserved, so no OTP needed on next login
+  };
+
+  // This function should NOT be called on logout - only for complete device reset
+  const clearDeviceTrust = () => {
+    localStorage.removeItem(DEVICE_TRUST_KEY);
+    localStorage.removeItem(DEVICE_FIRST_LOGIN_KEY);
+    localStorage.removeItem(USER_SESSION_KEY);
+    console.log("🗑️ Device trust and session cleared completely");
   };
 
   // Generate 6-digit OTP with rate limiting
@@ -108,11 +146,12 @@ const Login = ({ onLogin }) => {
   // Collect device information
   const collectDeviceInfo = async () => {
     try {
-      const ua = navigator.userAgent;
-      const platform = navigator.platform;
-      const language = navigator.language;
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const screenRes = `${window.screen.width}x${window.screen.height}`;
+      // Safe access to navigator properties with fallbacks
+      const ua = navigator?.userAgent || 'Unknown Browser';
+      const platform = navigator?.platform || 'Unknown Platform';
+      const language = navigator?.language || 'en-US';
+      const timezone = Intl?.DateTimeFormat()?.resolvedOptions()?.timeZone || 'UTC';
+      const screenRes = window?.screen ? `${window.screen.width}x${window.screen.height}` : 'Unknown';
       
       // Get location information
       let location = "Unknown";
@@ -126,8 +165,8 @@ const Login = ({ onLogin }) => {
         console.warn("Could not fetch location:", error);
       }
 
-      // Generate fingerprint for this device
-      const fingerprint = await generateDeviceFingerprint();
+      // Generate a simple device token instead of complex fingerprint
+      const deviceToken = generateDeviceToken();
 
       return {
         userAgent: ua,
@@ -137,60 +176,83 @@ const Login = ({ onLogin }) => {
         screenResolution: screenRes,
         location,
         timestamp: new Date().toISOString(),
-        fingerprint: fingerprint,
+        fingerprint: deviceToken,
       };
     } catch (error) {
       console.error("Failed to collect device info:", error);
-      return null;
+      // Return a basic fallback object instead of null
+      return {
+        userAgent: 'Fallback Browser',
+        platform: 'Fallback Platform',
+        language: 'en-US',
+        timezone: 'UTC',
+        screenResolution: 'Unknown',
+        location: 'Unknown',
+        timestamp: new Date().toISOString(),
+        fingerprint: generateDeviceToken(),
+      };
     }
   };
 
   // Send OTP email using EmailJS
   const sendOTPEmail = async (otp, deviceInfo, username) => {
-    
-    
     try {
+      // Validate EmailJS configuration
+      if (!EMAILJS_CONFIG?.serviceId || !EMAILJS_CONFIG?.templateId || !EMAILJS_CONFIG?.publicKey) {
+        throw new Error('EmailJS configuration is incomplete');
+      }
+
+      // Enhanced template parameters with all required fields
       const templateParams = {
         to_email: ADMIN_EMAIL,
         to_name: "Admin",
         from_name: "Bill Generator Security",
+        username: username,
+        otp_code: otp,
+        otp: otp, // Alternative variable name
+        code: otp, // Another alternative
+        verification_code: otp, // Yet another alternative
+        location: deviceInfo?.location || 'Unknown Location',
+        time: deviceInfo?.timestamp || new Date().toISOString(),
+        timestamp: deviceInfo?.timestamp || new Date().toISOString(),
+        device_info: `Browser: ${deviceInfo?.userAgent || 'Unknown'}\nPlatform: ${deviceInfo?.platform || 'Unknown'}\nLocation: ${deviceInfo?.location || 'Unknown'}\nTime: ${deviceInfo?.timestamp || new Date().toISOString()}`,
+        user_agent: deviceInfo?.userAgent || 'Unknown Browser',
+        platform: deviceInfo?.platform || 'Unknown Platform',
+        screen_resolution: deviceInfo?.screenResolution || 'Unknown',
+        timezone: deviceInfo?.timezone || 'UTC',
+        language: deviceInfo?.language || 'en-US',
         subject: `Bill Generator - New Device Login - OTP: ${otp}`,
-        message: `
-🔐 NEW DEVICE LOGIN ATTEMPT
+        message: `🔐 NEW DEVICE LOGIN ATTEMPT
 
 Username: ${username}
 OTP Code: ${otp}
 
 📱 Device Information:
-• Browser: ${deviceInfo.userAgent}
-• Platform: ${deviceInfo.platform}
-• Language: ${deviceInfo.language}
-• Timezone: ${deviceInfo.timezone}
-• Screen: ${deviceInfo.screenResolution}
-• Location: ${deviceInfo.location}
-• Time: ${deviceInfo.timestamp}
+• Browser: ${deviceInfo?.userAgent || 'Unknown'}
+• Platform: ${deviceInfo?.platform || 'Unknown'}
+• Language: ${deviceInfo?.language || 'Unknown'}
+• Timezone: ${deviceInfo?.timezone || 'UTC'}
+• Screen: ${deviceInfo?.screenResolution || 'Unknown'}
+• Location: ${deviceInfo?.location || 'Unknown'}
+• Time: ${deviceInfo?.timestamp || new Date().toISOString()}
 
 ✅ To approve this device, reply with the OTP code or share it with the user.
-
 ❌ To deny access, ignore this email.
 
 ---
-Bill Generator Security System
-        `,
-        // CRITICAL: These must match your EmailJS template variables exactly
-        username: username,
-        otp_code: otp,  // This should populate {{otp_code}} in your template
-        device_fingerprint: deviceInfo.fingerprint || 'N/A',
-        location: deviceInfo.location || 'N/A',
-        time: deviceInfo.timestamp || new Date().toISOString(),
-        // Backup variables in case your template uses different names
-        otp: otp,  // Alternative: {{otp}}
-        code: otp,  // Alternative: {{code}}
-        verification_code: otp,  // Alternative: {{verification_code}}
+Bill Generator Security System`
       };
 
-      
+      console.log('Attempting to send email via EmailJS...');
+      console.log('Template parameters being sent:', {
+        username: templateParams.username,
+        otp_code: templateParams.otp_code,
+        location: templateParams.location,
+        time: templateParams.time,
+        device_info: templateParams.device_info
+      });
 
+      // Send email using EmailJS
       const result = await emailjs.send(
         EMAILJS_CONFIG.serviceId,
         EMAILJS_CONFIG.templateId,
@@ -198,54 +260,34 @@ Bill Generator Security System
         EMAILJS_CONFIG.publicKey
       );
 
+      console.log('Email sent successfully:', result);
       
       toast({
         title: "OTP Email Sent!",
-        description: "Check your email for the verification code",
+        description: `Verification code sent to ${ADMIN_EMAIL}`,
         duration: 5000,
       });
       
       return true;
     } catch (error) {
-      console.error("Failed to send OTP email via EmailJS:", error);
-      console.error("Error details:", {
-        message: error.message,
-        status: error.status,
-        text: error.text
-      });
+      console.error("EmailJS Error:", error);
       
-      // Fallback: Open email client with prefilled content
-      const subject = encodeURIComponent(`Bill Generator - New Device Login - OTP: ${otp}`);
-      const body = encodeURIComponent(`
-🔐 NEW DEVICE LOGIN ATTEMPT
-
-Username: ${username}
-OTP Code: ${otp}
-
-📱 Device Information:
-• Browser: ${deviceInfo.userAgent}
-• Platform: ${deviceInfo.platform}
-• Language: ${deviceInfo.language}
-• Timezone: ${deviceInfo.timezone}
-• Screen: ${deviceInfo.screenResolution}
-• Location: ${deviceInfo.location}
-• Time: ${deviceInfo.timestamp}
-
-✅ To approve this device, reply with the OTP code or share it with the user.
-
-❌ To deny access, ignore this email.
-
----
-Bill Generator Security System
-      `);
-      
-      window.open(`mailto:${ADMIN_EMAIL}?subject=${subject}&body=${body}`, '_blank');
-      
+      // Show OTP directly to user as fallback
       toast({
-        title: "EmailJS Failed - Using Fallback",
-        description: `OTP: ${otp} - Email client opened as fallback. Error: ${error.message}`,
-        duration: 8000,
+        title: "Email Service Unavailable",
+        description: `Your OTP code is: ${otp}. Please use this code to verify your device.`,
+        duration: 15000,
       });
+      
+      // Also try to open email client as backup
+      const subject = encodeURIComponent(`Bill Generator Login - OTP: ${otp}`);
+      const body = encodeURIComponent(`Username: ${username}\nOTP Code: ${otp}\nTime: ${new Date().toISOString()}`);
+      
+      try {
+        window.open(`mailto:${ADMIN_EMAIL}?subject=${subject}&body=${body}`, '_blank');
+      } catch (mailError) {
+        console.warn('Could not open email client:', mailError);
+      }
       
       return false;
     }
@@ -264,88 +306,62 @@ Bill Generator Security System
     try {
       // Check credentials
       if (formData.username === "modiconcast" && formData.password === "concast2025") {
-        const currentFingerprint = await generateDeviceFingerprint();
-        const storedFingerprint = localStorage.getItem(DEVICE_FINGERPRINT_KEY);
+        console.log("✅ Credentials valid - checking device trust status...");
         
-        console.log("🔍 Login flow:", !storedFingerprint ? "FIRST TIME EVER" : 
-                storedFingerprint === currentFingerprint ? "SAME DEVICE" : "NEW DEVICE");
-
-        if (!storedFingerprint) {
-          // FIRST TIME EVER - Require OTP verification for security
-          console.log("First time login - requiring OTP verification");
-          const deviceInfo = await collectDeviceInfo();
-          const otp = generateOTP();
+        // Check if this device is already trusted
+        const isTrusted = isDeviceTrusted();
+        const isFirstTime = isFirstTimeDevice();
+        
+        console.log("🔍 Device status:", {
+          isTrusted: isTrusted,
+          isFirstTime: isFirstTime,
+          trustKey: DEVICE_TRUST_KEY,
+          firstLoginKey: DEVICE_FIRST_LOGIN_KEY
+        });
+        
+        if (isTrusted) {
+          // Device is already trusted - direct login
+          console.log("🔑 Device is trusted - direct login");
           
-          setOtpCode(otp);
-          setShowOTPDialog(true);
+          // Create user session to persist login state
+          createUserSession(formData.username);
           
-          sessionStorage.setItem(PENDING_OTP_KEY, JSON.stringify({
-            otp,
-            fingerprint: currentFingerprint,
-            username: formData.username,
-            remember: formData.remember,
-            deviceInfo,
-            timestamp: Date.now(),
-            expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes expiration
-            isFirstTime: true, // Mark as first time
-          }));
-
-          await sendOTPEmail(otp, deviceInfo, formData.username);
-
           toast({
-            title: "First Time Login - OTP Required",
-            description: "OTP sent to admin email. Please wait for approval.",
-            duration: 5000,
-          });
-          
-          setIsLoading(false);
-          return; // Don't proceed with login yet
-        } else if (storedFingerprint === currentFingerprint) {
-          // SAME DEVICE - Direct login (no OTP needed)
-          if (formData.remember) {
-            localStorage.setItem("billGenerator_loggedIn", "true");
-            localStorage.setItem("billGenerator_username", formData.username);
-          } else {
-            sessionStorage.setItem("billGenerator_loggedIn", "true");
-            sessionStorage.setItem("billGenerator_username", formData.username);
-          }
-
-          toast({
-            title: "Login Successful!",
-            description: `Welcome back, ${formData.username}!`,
+            title: "Welcome Back!",
+            description: "Trusted device detected - logging you in...",
             duration: 2000,
           });
-
-          onLogin(formData.username);
-        } else {
-          // NEW DEVICE DETECTED - OTP verification required
-          console.log("New device detected - requiring OTP verification");
-          const deviceInfo = await collectDeviceInfo();
-          const otp = generateOTP();
-          
-          setOtpCode(otp);
-          setShowOTPDialog(true);
-          
-          // Store pending OTP in session storage
-          sessionStorage.setItem(PENDING_OTP_KEY, JSON.stringify({
-            otp,
-            fingerprint: currentFingerprint,
-            username: formData.username,
-            remember: formData.remember,
-            deviceInfo,
-            timestamp: Date.now(),
-            expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes expiration
-          }));
-
-          // Send OTP email
-          await sendOTPEmail(otp, deviceInfo, formData.username);
-
-          toast({
-            title: "New Device Detected",
-            description: "OTP sent to admin email. Please wait for approval.",
-            duration: 5000,
-          });
+          onLogin();
+          return;
         }
+        
+        // Device needs OTP verification (first time or not trusted)
+        console.log("🔐 Device requires OTP verification");
+        const deviceInfo = await collectDeviceInfo();
+        const otp = generateOTP();
+        
+        setOtpCode(otp);
+        setShowOTPDialog(true);
+        
+        // Store pending OTP data
+        sessionStorage.setItem(PENDING_OTP_KEY, JSON.stringify({
+          otp,
+          username: formData.username,
+          remember: formData.remember,
+          deviceInfo,
+          timestamp: Date.now(),
+          expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes expiration
+          isFirstTime: isFirstTime
+        }));
+
+        // Send OTP email
+        await sendOTPEmail(otp, deviceInfo, formData.username);
+
+        toast({
+          title: isFirstTime ? "First Time Login" : "Device Verification Required", 
+          description: "A verification code has been sent to the admin email.",
+          duration: 5000,
+        });
       } else {
         toast({
           title: "Login Failed",
@@ -369,10 +385,10 @@ Bill Generator Security System
 
   // Verify OTP
   const verifyOTP = async () => {
-    if (!enteredOTP.trim()) {
+    if (!enteredOTP || enteredOTP.length !== 6) {
       toast({
-        title: "OTP Required",
-        description: "Please enter the OTP code.",
+        title: "Invalid OTP",
+        description: "Please enter a valid 6-digit OTP code.",
         variant: "destructive",
       });
       return;
@@ -381,60 +397,57 @@ Bill Generator Security System
     setIsVerifyingOTP(true);
 
     try {
-      const pendingData = sessionStorage.getItem(PENDING_OTP_KEY);
-      if (!pendingData) {
-        throw new Error("No pending OTP found");
-      }
-
-      const { otp, fingerprint, username, remember, deviceInfo, expiresAt, isFirstTime } = JSON.parse(pendingData);
-
+      const pendingData = JSON.parse(sessionStorage.getItem(PENDING_OTP_KEY) || '{}');
+      
       // Check if OTP has expired
-      if (expiresAt && Date.now() > expiresAt) {
-        sessionStorage.removeItem(PENDING_OTP_KEY);
+      if (Date.now() > (pendingData.expiresAt || 0)) {
+        toast({
+          title: "OTP Expired",
+          description: "The OTP has expired. Please try logging in again.",
+          variant: "destructive",
+        });
         setShowOTPDialog(false);
-        setOtpCode("");
         setEnteredOTP("");
-        throw new Error("OTP has expired. Please request a new one.");
+        sessionStorage.removeItem(PENDING_OTP_KEY);
+        return;
       }
 
-      console.log("OTP comparison:", { 
-        enteredOTP: enteredOTP.trim(), 
-        expectedOTP: otp, 
-        matches: enteredOTP.trim() === otp 
-      });
+      // Verify OTP
+      if (enteredOTP === pendingData.otp) {
+        console.log("✅ OTP verified successfully - permanently trusting device");
+        
+        // Trust this device permanently
+        const trustResult = trustDevice();
+        
+        if (trustResult) {
+          console.log("🔐 Device permanently trusted:", trustResult);
+          
+          // Create user session to persist login state
+          createUserSession(pendingData.username);
+          
+          // Clear pending OTP data
+          sessionStorage.removeItem(PENDING_OTP_KEY);
+          setShowOTPDialog(false);
+          setEnteredOTP("");
+          setOtpCode("");
 
-      if (enteredOTP.trim() === otp) {
-        // OTP verified - approve new device
-        localStorage.setItem(DEVICE_FINGERPRINT_KEY, fingerprint);
-        
-        // Clear any existing sessions
-        localStorage.removeItem("billGenerator_loggedIn");
-        localStorage.removeItem("billGenerator_username");
-        sessionStorage.removeItem("billGenerator_loggedIn");
-        sessionStorage.removeItem("billGenerator_username");
-        
-        // Store login state
-        if (remember) {
-          localStorage.setItem("billGenerator_loggedIn", "true");
-          localStorage.setItem("billGenerator_username", username);
+          toast({
+            title: "Device Trusted Successfully!",
+            description: "This device is now trusted. You won't need OTP again, even after logout.",
+            duration: 6000,
+          });
+
+          console.log("🎉 Device trust established - logging in");
+          onLogin();
         } else {
-          sessionStorage.setItem("billGenerator_loggedIn", "true");
-          sessionStorage.setItem("billGenerator_username", username);
+          console.error("❌ Failed to establish device trust");
+          toast({
+            title: "Trust Error",
+            description: "Could not establish device trust. Please try again.",
+            variant: "destructive",
+            duration: 5000,
+          });
         }
-
-        // Clear pending data
-        sessionStorage.removeItem(PENDING_OTP_KEY);
-        setShowOTPDialog(false);
-        setOtpCode("");
-        setEnteredOTP("");
-
-        toast({
-          title: isFirstTime ? "First Time Login Successful!" : "Device Approved!",
-          description: isFirstTime ? "Welcome! Your device has been registered." : "New device has been approved and logged in.",
-          duration: 3000,
-        });
-
-        onLogin(username);
       } else {
         toast({
           title: "Invalid OTP",
@@ -468,32 +481,31 @@ Bill Generator Security System
     });
   };
 
-  // Check if user is already logged in (and fingerprint matches)
+  // Check for existing session on component mount
   useEffect(() => {
-    const checkExistingSession = async () => {
+    const checkExistingSession = () => {
       try {
-        const isLoggedIn = localStorage.getItem("billGenerator_loggedIn") || sessionStorage.getItem("billGenerator_loggedIn");
-        const username = localStorage.getItem("billGenerator_username") || sessionStorage.getItem("billGenerator_username");
-        const storedFingerprint = localStorage.getItem(DEVICE_FINGERPRINT_KEY);
-
-        if (isLoggedIn && username && storedFingerprint) {
-          const currentFingerprint = await generateDeviceFingerprint();
-          
-          if (storedFingerprint === currentFingerprint) {
-            onLogin(username);
-          } else {
-            // Device fingerprint changed - clear session
-            localStorage.removeItem("billGenerator_loggedIn");
-            localStorage.removeItem("billGenerator_username");
-            sessionStorage.removeItem("billGenerator_loggedIn");
-            sessionStorage.removeItem("billGenerator_username");
-            
-            toast({
-              title: "Device Changed",
-              description: "Please log in again from this device.",
-              variant: "destructive",
-            });
-          }
+        const session = getUserSession();
+        const isTrusted = isDeviceTrusted();
+        
+        console.log("🔍 Checking existing session:", {
+          hasSession: !!session,
+          isLoggedIn: session?.isLoggedIn,
+          isTrusted: isTrusted,
+          username: session?.username
+        });
+        
+        // If user has an active session and device is trusted, auto-login
+        if (session && session.isLoggedIn && isTrusted) {
+          console.log("🔄 Auto-login: Valid session found, logging in automatically");
+          toast({
+            title: "Welcome Back!",
+            description: `Restoring your session...`,
+            duration: 2000,
+          });
+          onLogin();
+        } else {
+          console.log("👤 Manual login required");
         }
       } catch (error) {
         console.error("Session check error:", error);
@@ -503,11 +515,8 @@ Bill Generator Security System
     checkExistingSession();
   }, [onLogin]);
 
-  // Initialize EmailJS
-  useEffect(() => {
-    emailjs.init(EMAILJS_CONFIG.publicKey);
-    
-  }, []);
+  // EmailJS is initialized automatically when imported
+  // No need for manual initialization with the latest version
 
   // Cleanup expired OTPs on page load
   useEffect(() => {
@@ -833,4 +842,9 @@ Bill Generator Security System
   );
 };
 
-export default Login;
+// Export logout function for use in main app
+export { Login as default };
+export const logout = () => {
+  localStorage.removeItem("billgen_user_session");
+  console.log("👋 User logged out - session cleared");
+};

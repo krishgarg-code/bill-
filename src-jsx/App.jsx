@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, RouterProvider, createBrowserRouter } fro
 import { useState, useEffect } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import Login from "./components/Login";
+import Login, { logout } from "./components/Login";
 
 const queryClient = new QueryClient();
 
@@ -34,12 +34,18 @@ const App = () => {
   // Check if user is already logged in on app start
   useEffect(() => {
     const checkLoginStatus = () => {
-      const isLoggedIn = localStorage.getItem("billGenerator_loggedIn") || sessionStorage.getItem("billGenerator_loggedIn");
-      const storedUsername = localStorage.getItem("billGenerator_username") || sessionStorage.getItem("billGenerator_username");
-      
-      if (isLoggedIn && storedUsername) {
-        setIsLoggedIn(true);
-        setUsername(storedUsername);
+      try {
+        const sessionData = localStorage.getItem("billgen_user_session");
+        if (sessionData) {
+          const session = JSON.parse(sessionData);
+          if (session && session.isLoggedIn && session.username) {
+            setIsLoggedIn(true);
+            setUsername(session.username);
+            console.log("🔄 App: Restored user session:", session.username);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking login status:", error);
       }
     };
 
@@ -52,12 +58,14 @@ const App = () => {
   };
 
   const handleLogout = () => {
+    // Call the logout function from Login component to clear session
+    logout();
+    
+    // Update local state
     setIsLoggedIn(false);
     setUsername("");
-    localStorage.removeItem("billGenerator_loggedIn");
-    localStorage.removeItem("billGenerator_username");
-    sessionStorage.removeItem("billGenerator_loggedIn");
-    sessionStorage.removeItem("billGenerator_username");
+    
+    console.log("👋 App: User logged out successfully");
   };
 
   // If not logged in, show login page
